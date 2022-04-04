@@ -22,10 +22,12 @@ const signIn = (id) => {
 };
 exports.signIn = signIn;
 const protect = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    let token;
+    console.log(req.headers);
     try {
-        if (req.session.token) {
-            token = req.session.token;
+        let token;
+        if (req.headers.authorization &&
+            req.headers.authorization.startsWith("Bearer")) {
+            token = req.headers.authorization.split(" ")[1];
         }
         if (!token) {
             res.status(400);

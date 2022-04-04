@@ -8,12 +8,18 @@ export const login = catchError(async (req: any, res: Response) => {
   const user: any = await User.findOne({ email }).select("-__v +password");
 
   if (user && (await user.matchPassword(password, user.password))) {
-    req.session = { token: signIn(user._id) };
+  const token = signIn(user._id)
 
+    req.session = { token };
+    console.log({ data: {
+      user,
+      token
+    },})
     return res.status(201).json({
       status: "ok",
       data: {
         user,
+        token
       },
     });
   }
@@ -39,13 +45,14 @@ export const registerUser = catchError(async (req: any, res: Response) => {
     gander,
     lastName,
   });
-  req.session = { token: signIn(user._id) };
+  const token = signIn(user._id)
+  req.session = { token };
 
   res.status(201).json({
     status: "ok",
     data: {
-      ...user._doc,
-      token: signIn(user._id),
+      user,
+      token
     },
   });
 });

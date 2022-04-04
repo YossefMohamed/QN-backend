@@ -20,11 +20,17 @@ exports.login = (0, errorHandler_1.catchError)((req, res) => __awaiter(void 0, v
     const { email, password } = req.body;
     const user = yield userModel_1.default.findOne({ email }).select("-__v +password");
     if (user && (yield user.matchPassword(password, user.password))) {
-        req.session = { token: (0, authControllers_1.signIn)(user._id) };
+        const token = (0, authControllers_1.signIn)(user._id);
+        req.session = { token };
+        console.log({ data: {
+                user,
+                token
+            }, });
         return res.status(201).json({
             status: "ok",
             data: {
                 user,
+                token
             },
         });
     }
@@ -49,10 +55,14 @@ exports.registerUser = (0, errorHandler_1.catchError)((req, res) => __awaiter(vo
         gander,
         lastName,
     });
-    req.session = { token: (0, authControllers_1.signIn)(user._id) };
+    const token = (0, authControllers_1.signIn)(user._id);
+    req.session = { token };
     res.status(201).json({
         status: "ok",
-        data: Object.assign(Object.assign({}, user._doc), { token: (0, authControllers_1.signIn)(user._id) }),
+        data: {
+            user,
+            token
+        },
     });
 }));
 exports.getMe = (0, errorHandler_1.catchError)((req, res) => __awaiter(void 0, void 0, void 0, function* () {

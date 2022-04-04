@@ -105,6 +105,7 @@ exports.getPost = (0, errorHandler_1.catchError)((req, res) => __awaiter(void 0,
             select: "name img",
         },
     ]);
+    console.log(post.id);
     if (!post)
         throw new Error("Post not found");
     res.status(200).json({

@@ -96,12 +96,13 @@ export const likePost = catchError(async (req: any, res: Response) => {
 export const getPost = catchError(async (req: any, res: Response) => {
   const postID = req.params.id;
   console.log("postID");
-  const post = await Post.findById(postID).populate([
+  const post:any = await Post.findById(postID).populate([
     {
       path: "author",
       select: "name img",
     },
   ]);
+  console.log(post.id)
   if (!post) throw new Error("Post not found");
   res.status(200).json({
     status: "ok",

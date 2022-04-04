@@ -16,30 +16,32 @@ export const signIn = (id: Types.ObjectId) => {
 };
 
 export const protect = async (req: any, res: Response, next: any) => {
-  let token;
+  console.log( req.headers)
 
   try {
-    if (req.session.token) {
-      token = req.session.token;
+    let token;
+    if (
+      req.headers.authorization &&
+      req.headers.authorization.startsWith("Bearer")
+    ) {
+      token = req.headers.authorization.split(" ")[1];
     }
-
     if (!token) {
       res.status(400);
       return next(new Error("PLease Login !"));
     }
-
+  
     // 2- validate token
     const login: any = jwt.verify(
       token,
       process.env.JWT_SECRET || "randomSecret"
     );
-
     const freshUser = await User.findById(login.id);
-
+  
     if (!freshUser) {
       return next(new Error("Please Login Again !"));
     }
-
+  
     req.user = freshUser;
     next();
   } catch (error) {
