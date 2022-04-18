@@ -1,143 +1,110 @@
-import { Response, Request, NextFunction } from "express";
-import twilio from "twilio";
-import mongoose from "mongoose";
+import { Response } from "express";
 import User from "../models/userModel";
-import asyncHandler from "express-async-handler";
-import { signIn } from "../utiles/authGuard";
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_TOKEN);
+import { catchError } from "../utiles/errorHandler";
+import { IRequest, IResponse, signIn } from "./authControllers";
 
-export const signup = asyncHandler(async (req: Request, res: Response) => {
-  const {
-    name,
-    lastName,
-    number,
-    gender,
-    email,
-    password,
-    confirmPassword,
-  }: {
-    name: string;
-    lastName: string;
-    number: number;
-    gender: string;
-    email: string;
-    password: string;
-    confirmPassword: string;
-  } = req.body;
-  if (password !== confirmPassword) {
-    res.status(400).json({
-      status: "failed",
-      message: "password and confirm password must be same",
+export const login = catchError(async (req: any, res: Response) => {
+  const { email, password } = req.body;
+  const user: any = await User.findOne({ email }).select("-__v +password");
+
+  if (user && (await user.matchPassword(password, user.password))) {
+  const token = signIn(user._id)
+
+    req.session = { token };
+    console.log({ data: {
+      user,
+      token
+    },})
+    return res.status(201).json({
+      status: "ok",
+      data: {
+        user,
+        token
+      },
     });
-    return;
   }
+  res.statusCode = 401;
+  throw new Error("invalid email or password");
+});
 
-  const user = await User.create({
-    name,
-    lastName,
-    number,
-    gender,
+export const registerUser = catchError(async (req: any, res: Response) => {
+  const { email, name, password, gander, lastName } = req.body;
+  if (!name || !email || !password || !gander || !lastName) {
+    res.status(401);
+    throw new Error("Please Fill All The Inputs ");
+  }
+  const checkMail = await User.findOne({ email });
+  if (checkMail) {
+    res.status(404);
+    throw new Error("There's Account with this Email !");
+  }
+  const user: any = await User.create({
     email,
+    name,
     password,
+    gander,
+    lastName,
   });
-  const token = signIn(user.id);
-  res.status(200).json({
+  const token = signIn(user._id)
+  req.session = { token };
+
+  res.status(201).json({
     status: "ok",
-    data: { user, token },
+    data: {
+      user,
+      token
+    },
   });
 });
 
-export const messageSender = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const verCode = Math.floor(1000 + Math.random() * 9000);
-
-      if (!mongoose.isValidObjectId(req.query.user)) {
-        res.status(404).json({
-          status: "failed",
-          message: "Invalid ID!",
-        });
-        return;
-      }
-      const user: any = await User.findById(req.query.user);
-
-      if (!user) {
-        res.status(404).json({
-          status: "failed",
-          message: "User Not Found !",
-        });
-        return;
-      }
-      // client.messages
-      //   .create({
-      //     body: `Your Code Is ${verCode}\n STAY SAFE :)`,
-      //     messagingServiceSid: "MGcbb30f95b11a5d112df6ac104ca16f8f",
-      //     to: `+2${user.number}`,
-      //   })
-      //   .then((message) => console.log(message.sid));
-      user.code = `${verCode}`;
-      await user.save();
-
-      res.status(200).json({
-        status: "ok",
-        data: { user },
-      });
-    } catch (error: any) {
-      next(new Error(error));
-    }
+export const getMe = catchError(async (req: any, res: Response) => {
+  if (!req.user) {
+    res.status(404);
+    throw new Error("User Not Found !");
   }
-);
-
-export const verfiyNumber = asyncHandler(
-  async (req: Request, res: Response, next: NextFunction) => {
-    if (!mongoose.isValidObjectId(req.query.user)) {
-      res.status(404).json({
-        status: "failed",
-        message: "Invalid ID!",
-      });
-      return;
-    }
-    const user: any = await User.findById(req.query.user);
-
-    if (!user) {
-      res.status(404).json({
-        status: "failed",
-        message: "User Not Found !",
-      });
-      return;
-    }
-
-    if (user.code === req.body.code) {
-      user.verified = true;
-      user.code = undefined;
-      await user.save();
-      res.status(200).json({
-        status: "ok",
-        data: { user },
-      });
-      return;
-    }
-    res.status(200).json({
-      status: "failed",
-      message: "Code Is Not Correct",
-    });
-  }
-);
-
-export const login = asyncHandler(async (req: Request, res: Response) => {
-  const { number, password } = req.body;
-  const user: any = await User.findOne({ number });
-  if (!user || !(await user.matchPassword(password))) {
-    res.status(404).json({
-      status: "failed",
-      message: "Number Or Password Is Incorrect",
-    });
-    return;
-  }
-  const token = signIn(user.id);
-
-  res.status(200).json({
-    status: "ok",
-    data: { user, token },
-  });
+  res.status(200).json({ status: "ok", data: req.user });
 });
+
+export const getUserProfile = catchError(async (req: any, res: Response) => {
+  const user = await User.findById(req.params.id);
+  if (!user) throw new Error("User not found !");
+  res.status(200).json({ status: "ok", data: user });
+});
+
+export const updateMe = catchError(async (req: any, res: Response) => {
+  const { email, name, password, gander, lastName, oldPassword } = req.body;
+  if (!name || !email || !password || !gander || !lastName) {
+    throw new Error("Please Fill All Fields !");
+  }
+
+  req.user.email = email;
+  req.user.name = name;
+  req.user.lastName = lastName;
+  req.user.gander = gander;
+
+  if (req.body.password) {
+    if (req.body.password !== req.body.confirmPassword) {
+      res.status(400);
+      throw new Error("Password And Confirm Password Not Equal !");
+    }
+    if (
+      req.user &&
+      !(await req.user.matchPassword(oldPassword, req.user.password))
+    ) {
+      res.status(400);
+      throw new Error("Incorrect Password");
+    }
+
+    req.user.password = req.body.password;
+  }
+  const user = await req.user.save();
+  res.status(200).json({ status: "ok", data: user });
+});
+
+export const logout = (req: any, res: any) => {
+  res.clearCookie("session", { path: "/" });
+
+  res.status(204).json({
+    status: "ok",
+  });
+};

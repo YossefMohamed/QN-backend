@@ -14,61 +14,64 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importDefault(require("mongoose"));
 const bcrypt_1 = __importDefault(require("bcrypt"));
-const validateEmail = function (email) {
-    var re = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-    return re.test(email);
-};
 const userSchema = new mongoose_1.default.Schema({
-    verified: {
-        type: Boolean,
-        default: false,
-    },
     name: {
         type: String,
+        required: true,
+    },
+    lastName: { type: String, required: true },
+    email: {
+        type: String,
+        unique: true,
+        lowercase: true,
+        trim: true,
+        required: [true, "Please Enter Your Email !"],
+    },
+    gander: {
+        type: String,
+        enum: ["male", "female"],
         required: true,
     },
     password: {
         type: String,
         required: true,
-        minlength: 8,
-    },
-    lastName: {
-        type: String,
-        required: true,
-    },
-    email: {
-        type: String,
-        unique: true,
-        required: false,
-        validate: [validateEmail, "enter a valide email !"],
-    },
-    number: {
-        type: String,
-        unique: true,
-        required: true,
+        minlength: [8, "Password Must Be More Than 8 Chars !"],
     },
     isAdmin: {
         type: Boolean,
+        required: true,
         default: false,
     },
-    code: {
+    img: {
         type: String,
-    },
-    gender: {
-        type: String,
-        enum: ["male", "female"],
-        required: true,
+        default: "static/img/default.jpg",
     },
 }, {
     timestamps: true,
 });
+userSchema.set("toJSON", { virtuals: true });
+userSchema.set("toObject", { virtuals: true });
+userSchema.virtual("fullName").get(function () {
+    return `${this.name} ${this.lastName}`;
+});
+userSchema.virtual("favorite", {
+    ref: "Favorite",
+    localField: "_id",
+    foreignField: "user",
+});
+// const schema = new Schema<IUser, UserModel>({ name: String });
 userSchema.pre("save", function (next) {
     return __awaiter(this, void 0, void 0, function* () {
+        this.img = `https://avatars.dicebear.com/api/${this.gander}/${this.name}-${this.lastName}.svg`;
         if (!this.isModified("password"))
             return next();
         this.password = yield bcrypt_1.default.hash(this.password, 8);
         next();
     });
+});
+userSchema.pre(/^find/, function (next) {
+    this.populate("favorite");
+    next();
 });
 userSchema.methods.matchPassword = function (enteredPassword) {
     return __awaiter(this, void 0, void 0, function* () {
