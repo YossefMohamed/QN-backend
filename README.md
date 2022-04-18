@@ -1,1 +1,1 @@
-# QN-backend
+# covid-app-api
